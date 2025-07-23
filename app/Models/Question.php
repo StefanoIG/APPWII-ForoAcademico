@@ -9,7 +9,7 @@ class Question extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['titulo', 'contenido', 'category_id', 'user_id'];
+    protected $fillable = ['titulo', 'contenido', 'contenido_markdown', 'contenido_html', 'category_id', 'user_id'];
 
     // Relaciones
     public function user()
@@ -35,6 +35,11 @@ class Question extends Model
     public function bestAnswer()
     {
         return $this->belongsTo(Answer::class, 'mejor_respuesta_id');
+    }
+
+    public function attachments()
+    {
+        return $this->hasMany(QuestionAttachment::class);
     }
 
     // Relación polimórfica para votos

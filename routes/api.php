@@ -71,6 +71,10 @@ Route::group(['middleware' => 'auth:api'], function () {
     // === ETIQUETAS (solo admin para CRUD) ===
     Route::apiResource('tags', TagController::class)->except(['index', 'show']);
 
+    // === ARCHIVOS ADJUNTOS ===
+    Route::delete('attachments/{attachment}', [QuestionController::class, 'deleteAttachment']);
+    Route::get('attachments/info', [QuestionController::class, 'getFileUploadInfo']);
+
     // === USUARIOS ===
     Route::get('profile', [UserController::class, 'profile']);
     Route::apiResource('users', UserController::class)->except(['create', 'store']);

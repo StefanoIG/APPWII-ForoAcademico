@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreQuestionRequest;
 use App\Http\Requests\UpdateQuestionRequest;
 use App\Models\Question;
+use App\Services\FileUploadService;
+use App\Services\MarkdownService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,12 +16,21 @@ class QuestionController extends Controller
 {
     use AuthorizesRequests;
 
+    protected FileUploadService $fileUploadService;
+    protected MarkdownService $markdownService;
+
+    public function __construct(FileUploadService $fileUploadService, MarkdownService $markdownService)
+    {
+        $this->fileUploadService = $fileUploadService;
+        $this->markdownService = $markdownService;
+    }
+
     /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
     {
-        $query = Question::with(['user', 'category', 'tags', 'answers', 'bestAnswer', 'votes']);
+        $query = Question::with(['user', 'category', 'tags', 'answers', 'bestAnswer', 'votes', 'attachments']);
 
         // Filtros
         if ($request->filled('category_id')) {
@@ -73,24 +84,42 @@ class QuestionController extends Controller
         // El Form Request ya validó los datos
         $validated = $request->validated();
 
+        // Procesar markdown si se proporciona
+        $contenidoMarkdown = $validated['contenido_markdown'] ?? null;
+        $contenidoHtml = null;
+        
+        if ($contenidoMarkdown) {
+            $contenidoMarkdown = $this->markdownService->sanitize($contenidoMarkdown);
+            $contenidoHtml = $this->markdownService->toHtml($contenidoMarkdown);
+        }
+
         // Usamos una transacción para asegurar la integridad de los datos
-        $question = DB::transaction(function () use ($validated, $request) {
+        $question = DB::transaction(function () use ($validated, $request, $contenidoMarkdown, $contenidoHtml) {
             $question = Question::create([
                 'user_id' => Auth::id(),
                 'category_id' => $validated['category_id'],
                 'titulo' => $validated['titulo'],
                 'contenido' => $validated['contenido'],
+                'contenido_markdown' => $contenidoMarkdown,
+                'contenido_html' => $contenidoHtml,
                 'estado' => 'abierta',
             ]);
 
             // Asocia las etiquetas a la pregunta
             $question->tags()->attach($validated['tags']);
 
+            // Procesar archivos adjuntos si existen
+            if ($request->hasFile('attachments')) {
+                foreach ($request->file('attachments') as $file) {
+                    $this->fileUploadService->uploadFile($file, $question->id);
+                }
+            }
+
             return $question;
         });
 
-        // Cargar relaciones para la respuesta
-        $question->load('user', 'category', 'tags');
+        // Cargar relaciones para la respuesta incluyendo archivos
+        $question->load('user', 'category', 'tags', 'attachments');
 
         return response()->json([
             'message' => 'Pregunta creada exitosamente.',
@@ -110,7 +139,8 @@ class QuestionController extends Controller
             'answers.user',
             'answers.votes',
             'bestAnswer',
-            'votes'
+            'votes',
+            'attachments'
         ]);
 
         // Incrementar vistas (opcional)
@@ -126,15 +156,44 @@ class QuestionController extends Controller
     {
         $this->authorize('update', $question);
 
+        // Procesar markdown si se proporciona
         $updateData = $request->only(['titulo', 'contenido', 'category_id', 'estado']);
-        $question->update($updateData);
-
-        // Actualizar tags si se proporcionan
-        if ($request->filled('tags')) {
-            $question->tags()->sync($request->tags);
+        
+        if ($request->filled('contenido_markdown')) {
+            $contenidoMarkdown = $this->markdownService->sanitize($request->contenido_markdown);
+            $updateData['contenido_markdown'] = $contenidoMarkdown;
+            $updateData['contenido_html'] = $this->markdownService->toHtml($contenidoMarkdown);
         }
 
-        $question->load(['user', 'category', 'tags', 'answers', 'votes']);
+        $question = DB::transaction(function () use ($request, $question, $updateData) {
+            $question->update($updateData);
+
+            // Actualizar tags si se proporcionan
+            if ($request->filled('tags')) {
+                $question->tags()->sync($request->tags);
+            }
+
+            // Eliminar archivos seleccionados
+            if ($request->filled('remove_attachments')) {
+                foreach ($request->remove_attachments as $attachmentId) {
+                    $attachment = $question->attachments()->find($attachmentId);
+                    if ($attachment) {
+                        $this->fileUploadService->deleteFile($attachment);
+                    }
+                }
+            }
+
+            // Agregar nuevos archivos
+            if ($request->hasFile('attachments')) {
+                foreach ($request->file('attachments') as $file) {
+                    $this->fileUploadService->uploadFile($file, $question->id);
+                }
+            }
+
+            return $question;
+        });
+
+        $question->load(['user', 'category', 'tags', 'answers', 'votes', 'attachments']);
 
         return response()->json([
             'message' => 'Pregunta actualizada exitosamente.',
@@ -202,9 +261,39 @@ class QuestionController extends Controller
     {
         $user = Auth::user();
         $favorites = $user->favorites()
-            ->with(['user', 'category', 'tags', 'answers', 'votes'])
+            ->with(['user', 'category', 'tags', 'answers', 'votes', 'attachments'])
             ->paginate(20);
 
         return response()->json($favorites);
+    }
+
+    /**
+     * Eliminar archivo adjunto específico
+     */
+    public function deleteAttachment($attachmentId)
+    {
+        $attachment = \App\Models\QuestionAttachment::findOrFail($attachmentId);
+        $question = $attachment->question;
+
+        // Verificar permisos (solo el autor o admin)
+        if ($question->user_id !== Auth::id() && Auth::user()->rol !== 'admin') {
+            return response()->json([
+                'message' => 'No tienes permisos para eliminar este archivo.'
+            ], 403);
+        }
+
+        $this->fileUploadService->deleteFile($attachment);
+
+        return response()->json([
+            'message' => 'Archivo eliminado exitosamente.'
+        ]);
+    }
+
+    /**
+     * Obtener información sobre límites de archivos
+     */
+    public function getFileUploadInfo()
+    {
+        return response()->json(\App\Services\FileUploadService::getAllowedFileInfo());
     }
 }

@@ -7,6 +7,7 @@ use App\Http\Requests\StoreAnswerRequest;
 use App\Http\Requests\UpdateAnswerRequest;
 use App\Models\Answer;
 use App\Models\Question;
+use App\Services\MarkdownService;
 use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,6 +15,13 @@ use Illuminate\Support\Facades\Auth;
 class AnswerController extends Controller
 {
     use AuthorizesRequests;
+
+    protected MarkdownService $markdownService;
+
+    public function __construct(MarkdownService $markdownService)
+    {
+        $this->markdownService = $markdownService;
+    }
     public function markAsBest(Request $request, Answer $answer)
     {
         $question = $answer->question;
@@ -70,8 +78,19 @@ class AnswerController extends Controller
             ], 422);
         }
 
+        // Procesar markdown si se proporciona
+        $contenidoMarkdown = $request->contenido_markdown ?? null;
+        $contenidoHtml = null;
+        
+        if ($contenidoMarkdown) {
+            $contenidoMarkdown = $this->markdownService->sanitize($contenidoMarkdown);
+            $contenidoHtml = $this->markdownService->toHtml($contenidoMarkdown);
+        }
+
         $answer = Answer::create([
             'contenido' => $request->contenido,
+            'contenido_markdown' => $contenidoMarkdown,
+            'contenido_html' => $contenidoHtml,
             'question_id' => $request->question_id,
             'user_id' => $user->id,
         ]);
@@ -105,9 +124,16 @@ class AnswerController extends Controller
             ], 403);
         }
 
-        $answer->update([
-            'contenido' => $request->contenido,
-        ]);
+        $updateData = ['contenido' => $request->contenido];
+
+        // Procesar markdown si se proporciona
+        if ($request->filled('contenido_markdown')) {
+            $contenidoMarkdown = $this->markdownService->sanitize($request->contenido_markdown);
+            $updateData['contenido_markdown'] = $contenidoMarkdown;
+            $updateData['contenido_html'] = $this->markdownService->toHtml($contenidoMarkdown);
+        }
+
+        $answer->update($updateData);
 
         $answer->load(['user', 'question', 'votes']);
 

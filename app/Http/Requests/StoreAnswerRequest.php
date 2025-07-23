@@ -23,6 +23,7 @@ class StoreAnswerRequest extends FormRequest
     {
         return [
             'contenido' => 'required|string|min:30',
+            'contenido_markdown' => 'nullable|string|min:30', // Contenido en markdown
             'question_id' => 'required|exists:questions,id',
         ];
     }
@@ -35,6 +36,7 @@ class StoreAnswerRequest extends FormRequest
         return [
             'contenido.required' => 'El contenido de la respuesta es obligatorio.',
             'contenido.min' => 'La respuesta debe tener al menos 30 caracteres.',
+            'contenido_markdown.min' => 'El contenido markdown debe tener al menos 30 caracteres.',
             'question_id.required' => 'Debe especificar la pregunta a responder.',
             'question_id.exists' => 'La pregunta especificada no existe.',
         ];

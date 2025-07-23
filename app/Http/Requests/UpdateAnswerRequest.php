@@ -23,6 +23,7 @@ class UpdateAnswerRequest extends FormRequest
     {
         return [
             'contenido' => 'required|string|min:30',
+            'contenido_markdown' => 'nullable|string|min:30', // Contenido en markdown
         ];
     }
 

@@ -9,7 +9,7 @@ class Answer extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['contenido', 'question_id', 'user_id'];
+    protected $fillable = ['contenido', 'contenido_markdown', 'contenido_html', 'question_id', 'user_id'];
 
     // Relaciones
     public function user()
