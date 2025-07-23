@@ -1,0 +1,78 @@
+services:
+  # Laravel Backend with Nginx
+  foro_academico:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: foro_academico
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    volumes:
+      - ./storage:/var/www/html/storage
+      - ./bootstrap/cache:/var/www/html/bootstrap/cache
+      - ./public/storage:/var/www/html/public/storage
+    environment:
+      - APP_NAME="Foro Académico"
+      - APP_ENV=production
+      - APP_KEY=base64:YOUR_APP_KEY_HERE
+      - APP_DEBUG=false
+      - APP_URL=http://localhost:8080
+      
+      # Database (External PostgreSQL)
+      - DB_CONNECTION=pgsql
+      - DB_HOST=postgres_foro_academico
+      - DB_PORT=5432
+      - DB_DATABASE=foro_academico
+      - DB_USERNAME=foro_user
+      - DB_PASSWORD=foro_password
+      
+      # JWT
+      - JWT_SECRET=YOUR_JWT_SECRET_HERE
+      - JWT_TTL=1440
+      
+      # Cache & Session
+      - CACHE_DRIVER=database
+      - SESSION_DRIVER=database
+      - QUEUE_CONNECTION=database
+      
+      # Mail (opcional)
+      - MAIL_MAILER=smtp
+      - MAIL_HOST=mailhog
+      - MAIL_PORT=1025
+      - MAIL_USERNAME=null
+      - MAIL_PASSWORD=null
+      - MAIL_ENCRYPTION=null
+      - MAIL_FROM_ADDRESS=noreply@foroacademico.com
+      - MAIL_FROM_NAME="Foro Académico"
+      
+      # File Storage
+      - FILESYSTEM_DISK=local
+      
+    networks:
+      - foro_network
+      - postgres_foro_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/api/public/categories"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # MailHog for testing emails (opcional)
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: foro_academico_mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"  # SMTP port
+      - "8025:8025"  # Web UI port
+    networks:
+      - foro_network
+
+networks:
+  foro_network:
+    driver: bridge
+  postgres_foro_network:
+    external: true
+    name: postgres_foro_network

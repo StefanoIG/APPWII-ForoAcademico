@@ -10,6 +10,7 @@
         "erusev/parsedown-extra": "^0.8.1",
         "intervention/image": "^3.11",
         "laravel/framework": "^12.0",
+        "laravel/pail": "^1.2",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.10.1",
         "league/commonmark": "^2.7",
@@ -17,7 +18,6 @@
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
-        "laravel/pail": "^1.2.2",
         "laravel/pint": "^1.13",
         "laravel/sail": "^1.41",
         "mockery/mockery": "^1.6",

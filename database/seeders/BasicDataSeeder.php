@@ -15,42 +15,50 @@ class BasicDataSeeder extends Seeder
      */
     public function run(): void
     {
-        // Crear usuario admin
-        User::create([
-            'name' => 'Administrador',
-            'email' => 'admin@foro.com',
-            'password' => Hash::make('password'),
-            'rol' => 'admin',
-            'reputacion' => 1000,
-        ]);
+        // Crear usuario admin (solo si no existe)
+        User::firstOrCreate(
+            ['email' => 'admin@foro.com'],
+            [
+                'name' => 'Administrador',
+                'password' => Hash::make('password'),
+                'rol' => 'admin',
+                'reputacion' => 1000,
+            ]
+        );
 
-        // Crear usuario moderador
-        User::create([
-            'name' => 'Moderador',
-            'email' => 'moderador@foro.com',
-            'password' => Hash::make('password'),
-            'rol' => 'moderador',
-            'reputacion' => 500,
-        ]);
+        // Crear usuario moderador (solo si no existe)
+        User::firstOrCreate(
+            ['email' => 'moderador@foro.com'],
+            [
+                'name' => 'Moderador',
+                'password' => Hash::make('password'),
+                'rol' => 'moderador',
+                'reputacion' => 500,
+            ]
+        );
 
-        // Crear algunos usuarios normales
-        User::create([
-            'name' => 'Juan Pérez',
-            'email' => 'juan@example.com',
-            'password' => Hash::make('password'),
-            'rol' => 'usuario',
-            'reputacion' => 150,
-        ]);
+        // Crear algunos usuarios normales (solo si no existen)
+        User::firstOrCreate(
+            ['email' => 'juan@example.com'],
+            [
+                'name' => 'Juan Pérez',
+                'password' => Hash::make('password'),
+                'rol' => 'usuario',
+                'reputacion' => 150,
+            ]
+        );
 
-        User::create([
-            'name' => 'María García',
-            'email' => 'maria@example.com',
-            'password' => Hash::make('password'),
-            'rol' => 'usuario',
-            'reputacion' => 75,
-        ]);
+        User::firstOrCreate(
+            ['email' => 'maria@example.com'],
+            [
+                'name' => 'María García',
+                'password' => Hash::make('password'),
+                'rol' => 'usuario',
+                'reputacion' => 75,
+            ]
+        );
 
-        // Crear categorías
+        // Crear categorías (solo si no existen)
         $categories = [
             ['nombre' => 'Matemáticas', 'descripcion' => 'Preguntas relacionadas con matemáticas y cálculo'],
             ['nombre' => 'Física', 'descripcion' => 'Preguntas sobre física y ciencias naturales'],
@@ -62,10 +70,10 @@ class BasicDataSeeder extends Seeder
         ];
 
         foreach ($categories as $category) {
-            Category::create($category);
+            Category::firstOrCreate(['nombre' => $category['nombre']], $category);
         }
 
-        // Crear etiquetas
+        // Crear etiquetas (solo si no existen)
         $tags = [
             ['nombre' => 'algebra', 'descripcion' => 'Problemas de álgebra'],
             ['nombre' => 'calculo', 'descripcion' => 'Cálculo diferencial e integral'],
@@ -87,7 +95,7 @@ class BasicDataSeeder extends Seeder
         ];
 
         foreach ($tags as $tag) {
-            Tag::create($tag);
+            Tag::firstOrCreate(['nombre' => $tag['nombre']], $tag);
         }
     }
 }

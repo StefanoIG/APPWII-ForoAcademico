@@ -1,0 +1,63 @@
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentation
+README.md
+*.md
+
+# Environment files
+.env
+.env.*
+!.env.docker
+
+# Dependencies (will be installed in container)
+/vendor
+/node_modules
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Laravel specific
+/storage/logs/*.log
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+/storage/app/public/*
+/bootstrap/cache/*.php
+.phpunit.result.cache
+
+# Testing
+/tests
+phpunit.xml
+
+# Build artifacts
+/public/hot
+/public/storage
+/public/build
+
+# Temporary files
+*.tmp
+*.temp
+/tmp
+
+# Logs
+*.log
+npm-debug.log*
+
+# Development tools
+.editorconfig
+.styleci.yml
