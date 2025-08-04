@@ -35,6 +35,93 @@ echo "JWT_REFRESH_TTL=20160" >> /var/www/html/.env
 echo "JWT_ALGO=HS256" >> /var/www/html/.env
 echo "✅ JWT configurado completamente"
 
+# PASO 3: Detectar entorno y configurar SSL/HTTPS si es necesario
+echo "🌍 Detectando entorno de aplicación..."
+APP_ENV=$(grep "^APP_ENV=" /var/www/html/.env | cut -d'=' -f2 | tr -d '"')
+
+if [ "$APP_ENV" = "production" ] || [ "$APP_ENV" = "prod" ]; then
+    echo "🏭 Entorno de PRODUCCIÓN detectado"
+    echo "🔒 Configurando HTTPS y SSL..."
+    
+    # Verificar si existen certificados SSL
+    if [ -f "/etc/ssl/certs/localhost.crt" ] && [ -f "/etc/ssl/private/localhost.key" ]; then
+        echo "✅ Certificados SSL encontrados"
+        
+        # Usar configuración de Nginx para producción
+        if [ -f "/etc/nginx/nginx.conf.prod" ]; then
+            echo "🔄 Aplicando configuración de Nginx para producción..."
+            cp /etc/nginx/nginx.conf.prod /etc/nginx/nginx.conf
+        fi
+        
+        # Actualizar APP_URL a HTTPS si no está configurado
+        if grep -q "APP_URL=http://" /var/www/html/.env; then
+            sed -i 's|APP_URL=http://|APP_URL=https://|g' /var/www/html/.env
+            echo "🔗 APP_URL actualizada a HTTPS"
+        fi
+        
+        # Configurar forzar HTTPS
+        if ! grep -q "APP_FORCE_HTTPS=" /var/www/html/.env; then
+            echo "APP_FORCE_HTTPS=true" >> /var/www/html/.env
+        else
+            sed -i 's/APP_FORCE_HTTPS=.*/APP_FORCE_HTTPS=true/' /var/www/html/.env
+        fi
+        
+        echo "✅ Configuración HTTPS completada"
+    else
+        echo "⚠️ Certificados SSL no encontrados. Generando certificados auto-firmados..."
+        
+        # Crear directorios si no existen
+        mkdir -p /etc/ssl/certs /etc/ssl/private
+        
+        # Generar certificados auto-firmados
+        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+            -keyout /etc/ssl/private/localhost.key \
+            -out /etc/ssl/certs/localhost.crt \
+            -subj "/C=US/ST=Local/L=Local/O=Development/CN=localhost"
+        
+        chmod 600 /etc/ssl/private/localhost.key
+        chmod 644 /etc/ssl/certs/localhost.crt
+        
+        echo "✅ Certificados SSL auto-firmados generados"
+        
+        # Aplicar configuración de producción
+        if [ -f "/etc/nginx/nginx.conf.prod" ]; then
+            cp /etc/nginx/nginx.conf.prod /etc/nginx/nginx.conf
+        fi
+    fi
+    
+    # Configurar headers de seguridad para producción
+    echo "🛡️ Configurando headers de seguridad..."
+    if ! grep -q "SECURE_HEADERS=" /var/www/html/.env; then
+        echo "SECURE_HEADERS=true" >> /var/www/html/.env
+    fi
+    
+else
+    echo "🏠 Entorno de DESARROLLO detectado"
+    echo "🔓 Configurando HTTP (desarrollo)..."
+    
+    # Usar configuración de Nginx para desarrollo
+    if [ -f "/etc/nginx/nginx.conf.dev" ]; then
+        echo "🔄 Aplicando configuración de Nginx para desarrollo..."
+        cp /etc/nginx/nginx.conf.dev /etc/nginx/nginx.conf
+    fi
+    
+    # Asegurar que APP_URL esté en HTTP para desarrollo
+    if grep -q "APP_URL=https://" /var/www/html/.env; then
+        sed -i 's|APP_URL=https://|APP_URL=http://|g' /var/www/html/.env
+        echo "🔗 APP_URL mantenida en HTTP para desarrollo"
+    fi
+    
+    # Configurar no forzar HTTPS en desarrollo
+    if ! grep -q "APP_FORCE_HTTPS=" /var/www/html/.env; then
+        echo "APP_FORCE_HTTPS=false" >> /var/www/html/.env
+    else
+        sed -i 's/APP_FORCE_HTTPS=.*/APP_FORCE_HTTPS=false/' /var/www/html/.env
+    fi
+    
+    echo "✅ Configuración HTTP para desarrollo completada"
+fi
+
 # Esperar a que PostgreSQL esté disponible
 echo "⏳ Esperando a que PostgreSQL esté disponible..."
 until pg_isready -h postgres_foro_academico -p 5432 -U foro_user; do
