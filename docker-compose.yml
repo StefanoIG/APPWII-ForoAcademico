@@ -11,7 +11,6 @@ services:
     volumes:
       - ./storage:/var/www/html/storage
       - ./bootstrap/cache:/var/www/html/bootstrap/cache
-      - ./public/storage:/var/www/html/public/storage
     environment:
       - APP_NAME="Foro Académico"
       - APP_ENV=production

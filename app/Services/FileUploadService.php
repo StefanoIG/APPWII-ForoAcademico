@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver;
@@ -117,23 +118,29 @@ class FileUploadService
      */
     private function processImage(UploadedFile $file, string $filePath): void
     {
-        $manager = new ImageManager(new Driver());
-        $image = $manager->read($file);
-        
-        // Redimensionar si es muy grande
-        if ($image->width() > 1920 || $image->height() > 1080) {
-            $image->scale(width: 1920, height: 1080);
+        try {
+            $manager = new ImageManager(new Driver());
+            $image = $manager->read($file);
+            
+            // Redimensionar si es muy grande
+            if ($image->width() > 1920 || $image->height() > 1080) {
+                $image->scale(width: 1920, height: 1080);
+            }
+            
+            // Optimizar calidad
+            $fullPath = Storage::disk('public')->path($filePath);
+            $directory = dirname($fullPath);
+            
+            if (!file_exists($directory)) {
+                mkdir($directory, 0755, true);
+            }
+            
+            $image->save($fullPath, quality: 85);
+        } catch (\Exception $e) {
+            // Si falla el procesamiento de imagen, guardar como archivo normal
+            Log::warning('Image processing failed, saving as regular file: ' . $e->getMessage());
+            Storage::disk('public')->put($filePath, file_get_contents($file));
         }
-        
-        // Optimizar calidad
-        $fullPath = Storage::disk('public')->path($filePath);
-        $directory = dirname($fullPath);
-        
-        if (!file_exists($directory)) {
-            mkdir($directory, 0755, true);
-        }
-        
-        $image->save($fullPath, quality: 85);
     }
 
     /**

@@ -7,7 +7,7 @@
   'app' => 
   array (
     'name' => 'Foro Académico',
-    'env' => 'production',
+    'env' => 'local',
     'debug' => true,
     'url' => 'http://localhost:8080',
     'frontend_url' => 'http://localhost:3000',
@@ -377,7 +377,7 @@
   ),
   'jwt' => 
   array (
-    'secret' => '1c3e93534720e54ddc8cbed0dd66ebfadfafd1d6b3507607e686861bb3454e2d',
+    'secret' => '9e11b39054bfa08cd7601ec89259cf837b22f908a58ab786747efa9c9dbede7b',
     'keys' => 
     array (
       'public' => NULL,

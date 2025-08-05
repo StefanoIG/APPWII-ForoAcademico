@@ -15,7 +15,10 @@ RUN apt-get update && apt-get install -y \
     unzip \
     nginx \
     supervisor \
-    && docker-php-ext-configure gd \
+    libjpeg-dev \
+    libfreetype6-dev \
+    libwebp-dev \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp \
     && docker-php-ext-install pdo_pgsql pgsql mbstring exif pcntl bcmath gd zip
 
 # Instalar Composer

@@ -41,6 +41,14 @@ class QuestionAttachment extends Model
     }
 
     /**
+     * Obtener el tipo de archivo (alias para file_type)
+     */
+    public function getTipoAttribute(): string
+    {
+        return $this->file_type;
+    }
+
+    /**
      * Verificar si es una imagen
      */
     public function isImage(): bool

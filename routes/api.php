@@ -74,6 +74,10 @@ Route::group(['middleware' => 'auth:api'], function () {
     // === ARCHIVOS ADJUNTOS ===
     Route::delete('attachments/{attachment}', [QuestionController::class, 'deleteAttachment']);
     Route::get('attachments/info', [QuestionController::class, 'getFileUploadInfo']);
+    
+    // === SUBIDA DE IMÁGENES ===
+    Route::post('images/upload', [QuestionController::class, 'uploadImage']);
+    Route::post('images/upload-multiple', [QuestionController::class, 'uploadMultipleImages']);
 
     // === USUARIOS ===
     Route::get('profile', [UserController::class, 'profile']);

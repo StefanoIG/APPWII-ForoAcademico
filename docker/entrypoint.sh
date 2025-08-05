@@ -145,6 +145,37 @@ echo "🌱 Ejecutando seeders básicos..."
 php /var/www/html/artisan db:seed --class=BasicDataSeeder --force --no-interaction
 echo "✅ Seeders ejecutados exitosamente"
 
+# Crear enlace de storage
+echo "🔗 Configurando enlace de storage..."
+if [ -L "/var/www/html/public/storage" ]; then
+    echo "Eliminando enlace de storage existente..."
+    rm -f /var/www/html/public/storage
+elif [ -d "/var/www/html/public/storage" ]; then
+    echo "Verificando si es un directorio vacío o un punto de montaje..."
+    if mountpoint -q /var/www/html/public/storage; then
+        echo "⚠️ /var/www/html/public/storage es un punto de montaje. Omitiendo..."
+    else
+        echo "Eliminando directorio de storage existente..."
+        rm -rf /var/www/html/public/storage
+    fi
+fi
+
+# Crear el enlace simbólico solo si no existe ya
+if [ ! -e "/var/www/html/public/storage" ]; then
+    ln -sf /var/www/html/storage/app/public /var/www/html/public/storage
+    echo "✅ Enlace de storage creado exitosamente"
+else
+    echo "✅ Enlace de storage ya existe"
+fi
+
+# Asegurar que el directorio uploads existe
+mkdir -p /var/www/html/storage/app/public/uploads/images
+mkdir -p /var/www/html/storage/app/public/uploads/documents
+mkdir -p /var/www/html/storage/app/public/uploads/videos
+mkdir -p /var/www/html/storage/app/public/uploads/audios
+chown -R www-data:www-data /var/www/html/storage/app/public
+echo "✅ Directorios de uploads creados"
+
 # Limpiar y cachear configuración
 echo "🧹 Limpiando caché..."
 php /var/www/html/artisan config:clear --no-interaction

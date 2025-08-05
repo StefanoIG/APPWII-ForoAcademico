@@ -84,35 +84,55 @@ class QuestionController extends Controller
         // El Form Request ya validó los datos
         $validated = $request->validated();
 
-        // Procesar markdown si se proporciona
-        $contenidoMarkdown = $validated['contenido_markdown'] ?? null;
-        $contenidoHtml = null;
-        
-        if ($contenidoMarkdown) {
-            $contenidoMarkdown = $this->markdownService->sanitize($contenidoMarkdown);
-            $contenidoHtml = $this->markdownService->toHtml($contenidoMarkdown);
-        }
-
         // Usamos una transacción para asegurar la integridad de los datos
-        $question = DB::transaction(function () use ($validated, $request, $contenidoMarkdown, $contenidoHtml) {
+        $question = DB::transaction(function () use ($validated, $request) {
+            // Crear la pregunta inicialmente
             $question = Question::create([
                 'user_id' => Auth::id(),
                 'category_id' => $validated['category_id'],
                 'titulo' => $validated['titulo'],
                 'contenido' => $validated['contenido'],
-                'contenido_markdown' => $contenidoMarkdown,
-                'contenido_html' => $contenidoHtml,
                 'estado' => 'abierta',
             ]);
 
-            // Asocia las etiquetas a la pregunta
-            $question->tags()->attach($validated['tags']);
+            // Asociar las etiquetas a la pregunta
+            if (!empty($validated['tags'])) {
+                $question->tags()->attach($validated['tags']);
+            }
 
-            // Procesar archivos adjuntos si existen
+            // Procesar archivos adjuntos e imágenes
+            $imageUrls = [];
+            $attachmentUrls = [];
+
             if ($request->hasFile('attachments')) {
-                foreach ($request->file('attachments') as $file) {
-                    $this->fileUploadService->uploadFile($file, $question->id);
+                foreach ($request->file('attachments') as $index => $file) {
+                    $attachment = $this->fileUploadService->uploadFile($file, $question->id);
+                    
+                    // Si es una imagen, guardar su URL para el markdown
+                    if ($attachment && $attachment->tipo === 'image') {
+                        $imageUrls[$index] = $attachment->url;
+                    }
+                    $attachmentUrls[$index] = $attachment;
                 }
+            }
+
+            // Procesar markdown después de tener las URLs de las imágenes
+            $contenidoMarkdown = $validated['contenido_markdown'] ?? null;
+            $contenidoHtml = null;
+            
+            if ($contenidoMarkdown) {
+                // Reemplazar placeholders de imágenes con URLs reales
+                $contenidoMarkdown = $this->processImagePlaceholders($contenidoMarkdown, $imageUrls);
+                
+                // Sanitizar y convertir markdown
+                $contenidoMarkdown = $this->markdownService->sanitize($contenidoMarkdown);
+                $contenidoHtml = $this->markdownService->toHtml($contenidoMarkdown);
+                
+                // Actualizar la pregunta con el contenido markdown procesado
+                $question->update([
+                    'contenido_markdown' => $contenidoMarkdown,
+                    'contenido_html' => $contenidoHtml,
+                ]);
             }
 
             return $question;
@@ -123,8 +143,31 @@ class QuestionController extends Controller
 
         return response()->json([
             'message' => 'Pregunta creada exitosamente.',
-            'question' => $question
+            'question' => $question,
+            'attachments_uploaded' => $question->attachments->count()
         ], 201);
+    }
+
+    /**
+     * Procesar placeholders de imágenes en el markdown
+     */
+    private function processImagePlaceholders($markdown, $imageUrls)
+    {
+        // Buscar patrones como ![alt](placeholder:0) o ![alt](file:0)
+        $pattern = '/!\[([^\]]*)\]\((?:placeholder|file):(\d+)\)/';
+        
+        return preg_replace_callback($pattern, function($matches) use ($imageUrls) {
+            $altText = $matches[1];
+            $index = (int)$matches[2];
+            
+            if (isset($imageUrls[$index])) {
+                // Reemplazar con la URL real de la imagen
+                return "![{$altText}]({$imageUrls[$index]})";
+            }
+            
+            // Si no hay URL, mantener el placeholder o remover
+            return "![{$altText}](imagen-no-disponible)";
+        }, $markdown);
     }
 
     /**
@@ -156,17 +199,9 @@ class QuestionController extends Controller
     {
         $this->authorize('update', $question);
 
-        // Procesar markdown si se proporciona
-        $updateData = $request->only(['titulo', 'contenido', 'category_id', 'estado']);
-        
-        if ($request->filled('contenido_markdown')) {
-            $contenidoMarkdown = $this->markdownService->sanitize($request->contenido_markdown);
-            $updateData['contenido_markdown'] = $contenidoMarkdown;
-            $updateData['contenido_html'] = $this->markdownService->toHtml($contenidoMarkdown);
-        }
-
-        $question = DB::transaction(function () use ($request, $question, $updateData) {
-            $question->update($updateData);
+        $question = DB::transaction(function () use ($request, $question) {
+            // Datos básicos a actualizar
+            $updateData = $request->only(['titulo', 'contenido', 'category_id', 'estado']);
 
             // Actualizar tags si se proporcionan
             if ($request->filled('tags')) {
@@ -183,12 +218,39 @@ class QuestionController extends Controller
                 }
             }
 
-            // Agregar nuevos archivos
+            // Procesar nuevos archivos adjuntos e imágenes
+            $imageUrls = [];
+            $newAttachments = [];
+
             if ($request->hasFile('attachments')) {
-                foreach ($request->file('attachments') as $file) {
-                    $this->fileUploadService->uploadFile($file, $question->id);
+                foreach ($request->file('attachments') as $index => $file) {
+                    $attachment = $this->fileUploadService->uploadFile($file, $question->id);
+                    
+                    // Si es una imagen, guardar su URL para el markdown
+                    if ($attachment && $attachment->tipo === 'image') {
+                        $imageUrls[$index] = $attachment->url;
+                    }
+                    $newAttachments[$index] = $attachment;
                 }
             }
+
+            // Procesar markdown después de tener las URLs de las imágenes
+            if ($request->filled('contenido_markdown')) {
+                $contenidoMarkdown = $request->contenido_markdown;
+                
+                // Reemplazar placeholders de imágenes con URLs reales
+                $contenidoMarkdown = $this->processImagePlaceholders($contenidoMarkdown, $imageUrls);
+                
+                // Sanitizar y convertir markdown
+                $contenidoMarkdown = $this->markdownService->sanitize($contenidoMarkdown);
+                $contenidoHtml = $this->markdownService->toHtml($contenidoMarkdown);
+                
+                $updateData['contenido_markdown'] = $contenidoMarkdown;
+                $updateData['contenido_html'] = $contenidoHtml;
+            }
+
+            // Actualizar la pregunta
+            $question->update($updateData);
 
             return $question;
         });
@@ -197,7 +259,8 @@ class QuestionController extends Controller
 
         return response()->json([
             'message' => 'Pregunta actualizada exitosamente.',
-            'question' => $question
+            'question' => $question,
+            'attachments_count' => $question->attachments->count()
         ]);
     }
 
@@ -295,5 +358,82 @@ class QuestionController extends Controller
     public function getFileUploadInfo()
     {
         return response()->json(\App\Services\FileUploadService::getAllowedFileInfo());
+    }
+
+    /**
+     * Subir imagen individualmente (para editores de markdown)
+     */
+    public function uploadImage(Request $request)
+    {
+        $request->validate([
+            'image' => 'required|image|max:5120', // 5MB máximo
+        ]);
+
+        if (!$request->hasFile('image')) {
+            return response()->json([
+                'message' => 'No se proporcionó ninguna imagen.'
+            ], 422);
+        }
+
+        try {
+            // Crear una pregunta temporal o usar ID temporal
+            $questionId = $request->input('question_id', 'temp_' . uniqid());
+            
+            $attachment = $this->fileUploadService->uploadFile(
+                $request->file('image'), 
+                $questionId
+            );
+
+            return response()->json([
+                'message' => 'Imagen subida exitosamente.',
+                'attachment' => $attachment,
+                'url' => $attachment->url,
+                'markdown' => "![Imagen]({$attachment->url})"
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error al subir la imagen: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Subir múltiples imágenes para preview de markdown
+     */
+    public function uploadMultipleImages(Request $request)
+    {
+        $request->validate([
+            'images' => 'required|array|max:5',
+            'images.*' => 'image|max:5120', // 5MB por imagen
+        ]);
+
+        $uploadedImages = [];
+        $questionId = $request->input('question_id', 'temp_' . uniqid());
+
+        try {
+            foreach ($request->file('images') as $index => $image) {
+                $attachment = $this->fileUploadService->uploadFile($image, $questionId);
+                
+                $uploadedImages[] = [
+                    'index' => $index,
+                    'attachment' => $attachment,
+                    'url' => $attachment->url,
+                    'markdown' => "![Imagen {$index}]({$attachment->url})",
+                    'placeholder' => "![Imagen {$index}](file:{$index})"
+                ];
+            }
+
+            return response()->json([
+                'message' => 'Imágenes subidas exitosamente.',
+                'images' => $uploadedImages,
+                'count' => count($uploadedImages)
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error al subir imágenes: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
