@@ -7,9 +7,9 @@
   'app' => 
   array (
     'name' => 'Foro Académico',
-    'env' => 'local',
+    'env' => 'production',
     'debug' => true,
-    'url' => 'http://localhost:8080',
+    'url' => 'https://localhost:8443',
     'frontend_url' => 'http://localhost:3000',
     'asset_url' => NULL,
     'timezone' => 'UTC',
@@ -351,7 +351,7 @@
       array (
         'driver' => 'local',
         'root' => '/var/www/html/storage/app/public',
-        'url' => 'http://localhost:8080/storage',
+        'url' => 'https://localhost:8443/storage',
         'visibility' => 'public',
         'throw' => false,
         'report' => false,
@@ -377,7 +377,7 @@
   ),
   'jwt' => 
   array (
-    'secret' => '9e11b39054bfa08cd7601ec89259cf837b22f908a58ab786747efa9c9dbede7b',
+    'secret' => '576b42a0b9a0f220fe0c6b856b376399c983cd5778fe01f6d892ae29ad5f4e2c',
     'keys' => 
     array (
       'public' => NULL,
@@ -656,7 +656,7 @@
       2 => '127.0.0.1',
       3 => '127.0.0.1:8000',
       4 => '::1',
-      5 => 'localhost:8080',
+      5 => 'localhost:8443',
     ),
     'guard' => 
     array (
